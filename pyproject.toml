@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dash-konva-annotation"
+version = "0.1.0"
+description = "Transparent Konva annotation layer for Dash applications"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "dash>=4.5.1",
+]
+
+[project.optional-dependencies]
+demo = [
+  "dash-mantine-components>=3.0.0",
+  "plotly>=6.0.0",
+]
+test = [
+  "pytest>=8.0.0",
+]
+
+[tool.setuptools]
+packages = ["dash_konva_annotation"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+dash_konva_annotation = ["*.js", "*.css", "*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
