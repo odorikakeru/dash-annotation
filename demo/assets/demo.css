@@ -1,0 +1,21 @@
+body {
+  background: #f1f3f5;
+}
+
+.annotatable-region {
+  position: relative;
+  min-height: 700px;
+}
+
+.demo-workspace {
+  min-height: 700px;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.annotation-json {
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

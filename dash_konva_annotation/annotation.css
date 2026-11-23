@@ -1,0 +1,7 @@
+.dash-konva-annotation-surface {
+  overflow: hidden;
+}
+
+.dash-konva-annotation-surface canvas {
+  display: block;
+}
