@@ -2,18 +2,25 @@
 
 import json
 import os
+from typing import Any
+
+import dash
+import dash_mantine_components as dmc  # type: ignore
+import plotly.graph_objects as go  # type: ignore
+from dash import Input, Output, callback, dcc, html
+
+from dash_konva_annotation import (
+    AnnotationLayer,
+    AnnotationLayerAnnotation,
+    AnnotationLayerMode,
+    AnnotationLayerTool,
+)
 
 os.environ.setdefault("REACT_VERSION", "19.2.4")
 
-import dash
-import dash_mantine_components as dmc
-import plotly.graph_objects as go
-from dash import Input, Output, State, callback, dcc, html
 
-from dash_konva_annotation import AnnotationLayer
-
-
-def build_figure():
+def build_figure() -> go.Figure:
+    """Build and return the initial Plotly figure."""
     figure = go.Figure(
         data=[
             go.Scatter(
@@ -268,7 +275,7 @@ app.layout = dmc.MantineProvider(
     Output("annotation-layer", "mode"),
     Input("mode-control", "value"),
 )
-def update_mode(mode):
+def update_mode(mode: AnnotationLayerMode) -> AnnotationLayerMode:
     return mode
 
 
@@ -276,7 +283,7 @@ def update_mode(mode):
     Output("annotation-layer", "tool"),
     Input("tool-control", "value"),
 )
-def update_tool(tool):
+def update_tool(tool: AnnotationLayerTool) -> AnnotationLayerTool:
     return tool
 
 
@@ -284,7 +291,7 @@ def update_tool(tool):
     Output("annotation-layer", "color"),
     Input("color-control", "value"),
 )
-def update_color(color):
+def update_color(color: str) -> str:
     return color
 
 
@@ -292,7 +299,7 @@ def update_color(color):
     Output("annotation-layer", "strokeWidth"),
     Input("stroke-control", "value"),
 )
-def update_stroke_width(width):
+def update_stroke_width(width: float) -> float:
     return width
 
 
@@ -301,7 +308,7 @@ def update_stroke_width(width):
     Input("clear-button", "n_clicks"),
     prevent_initial_call=True,
 )
-def clear_annotations(_clicks):
+def clear_annotations(_clicks) -> list[dict[str, Any]]:
     return []
 
 
@@ -309,7 +316,7 @@ def clear_annotations(_clicks):
     Output("annotation-json", "children"),
     Input("annotation-layer", "annotations"),
 )
-def show_annotations(annotations):
+def show_annotations(annotations: list[AnnotationLayerAnnotation] | None) -> str:
     return json.dumps(annotations or [], indent=2)
 
 
@@ -317,7 +324,7 @@ def show_annotations(annotations):
     Output("counter-label", "children"),
     Input("counter-button", "n_clicks"),
 )
-def show_counter(clicks):
+def show_counter(clicks: int | None) -> str:
     return f"Button clicks: {clicks or 0}"
 
 
@@ -325,7 +332,7 @@ def show_counter(clicks):
     Output("selection-label", "children"),
     Input("workspace-select", "value"),
 )
-def show_selection(value):
+def show_selection(value: str | None) -> str:
     return f"Selected subsystem: {value.title() if value else 'None'}"
 
 

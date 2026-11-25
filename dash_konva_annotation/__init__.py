@@ -1,5 +1,7 @@
 """Transparent Konva annotation overlay for Dash."""
 
+from typing import Any, Literal
+
 from dash.development.base_component import Component
 
 __version__ = "0.1.0"
@@ -19,14 +21,41 @@ _css_dist = [
 ]
 
 
+type AnnotationLayerMode = Literal["view", "edit", "hidden"]
+"""Annotation layer interaction modes.
+
+- "view": The layer is view-only.
+- "edit": The layer is editable.
+- "hidden": The layer is hidden.
+"""
+
+type AnnotationLayerTool = Literal["select", "pen", "arrow", "rectangle", "ellipse"]
+"""Annotation layer interaction tools.
+
+- "select": The selection tool.
+- "pen": The freehand drawing tool.
+- "arrow": The arrow annotation tool.
+- "rectangle": The rectangle annotation tool.
+- "ellipse": The ellipse annotation tool.
+"""
+
+type AnnotationLayerAnnotationKeys = Literal[
+    "id", "type", "x", "y", "width", "height", "points", "color", "strokeWidth"
+]
+"""Annotation layer annotation dictionary keys."""
+
+type AnnotationLayerAnnotation = dict[AnnotationLayerAnnotationKeys, Any]
+"""Annotation layer annotation dictionary."""
+
+
 class AnnotationLayer(Component):
     """Render JSON annotations over a positioned Dash workspace."""
 
-    _children_props = []
-    _base_nodes = []
+    _children_props: list[str] = []  # noqa: RUF012
+    _base_nodes: list[str] = []  # noqa: RUF012
     _namespace = "dash_konva_annotation"
     _type = "AnnotationLayer"
-    _prop_names = [
+    _prop_names: list[str] = [  # noqa: RUF012
         "id",
         "mode",
         "tool",
@@ -37,22 +66,47 @@ class AnnotationLayer(Component):
         "className",
         "style",
     ]
-    _valid_wildcard_attributes = []
-    available_properties = _prop_names
-    available_wildcard_properties = []
+    _valid_wildcard_attributes: list[str] = []  # noqa: RUF012
+    available_properties: list[str] = _prop_names
+    available_wildcard_properties: list[str] = []  # noqa: RUF012
+
     def __init__(
         self,
-        id=None,
-        mode="view",
-        tool="select",
-        annotations=None,
-        color="#e03131",
-        strokeWidth=3,
-        selectedId=None,
-        className=None,
-        style=None,
-        **kwargs,
-    ):
+        id: str | dict[str, Any] | None = None,
+        mode: AnnotationLayerMode = "view",
+        tool: AnnotationLayerTool = "select",
+        annotations: list[dict[str, Any]] | None = None,
+        color: str = "#e03131",
+        strokeWidth: float = 3,
+        selectedId: str | None = None,
+        className: str | None = None,
+        style: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize an AnnotationLayer component.
+
+        :param id: The unique identifier for the component.
+        :type id: str | dict[str, Any] | None
+        :param mode: The interaction mode: "view", "edit", or "hidden".
+        :type mode: AnnotationLayerMode
+        :param tool: The active interaction tool: "select", "pen", "arrow",
+            "rectangle", or "ellipse".
+        :type tool: AnnotationLayerTool
+        :param annotations: JSON-serializable annotation dictionaries to render.
+        :type annotations: list[dict[str, Any]] | None
+        :param color: The default color for annotations.
+        :type color: str
+        :param strokeWidth: The default stroke width for annotations.
+        :type strokeWidth: int | float
+        :param selectedId: The ID of the selected annotation, or None.
+        :type selectedId: str | None
+        :param className: The CSS class name for the component.
+        :type className: str | None
+        :param style: The inline style for the component.
+        :type style: dict[str, Any] | None
+        :param kwargs: Additional Dash component properties.
+        :type kwargs: Any
+        """
         props = {
             "id": id,
             "mode": mode,

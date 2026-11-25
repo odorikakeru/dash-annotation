@@ -40,6 +40,67 @@ Open the local URL printed by Dash. The demo sets `REACT_VERSION=19.2.4` before 
 
 The toolbar offers Select, Pen, Arrow, Rectangle, and Ellipse; color, stroke width, and Clear annotations are also available. Deleting the selected annotation uses Delete or Backspace, except when focus is in an input, textarea, select, or content-editable element.
 
+### What happens during an interaction?
+
+In Edit mode, the layer listens to pointer events on its Konva canvas:
+
+1. Pointer down on empty canvas starts a draft at that position. With Select active, clicking empty canvas instead clears the current selection.
+2. Pointer movement updates the draft locally in the browser. Pen records a series of points; Arrow tracks its start and end; Rectangle and Ellipse calculate their bounds from the drag.
+3. Pointer up completes the shape. Tiny or zero-size gestures are ignored. A valid shape is added to `annotations` and becomes selected.
+4. With Select active, clicking an existing shape selects it and dragging it moves it. Delete or Backspace removes the selected shape.
+
+The layer does not send every pointer movement to Python. It keeps an in-progress draft in React, then reports committed annotation changes and selection changes to Dash. This keeps drawing responsive while still making completed edits available to Dash callbacks.
+
+## Props and callbacks
+
+`AnnotationLayer` behaves like other Dash components: its properties are the interface between the layer and your Dash application. A callback can set properties to configure it, and can read properties that the user changed.
+
+| Property | Direction | Meaning |
+| --- | --- | --- |
+| `mode` | App → layer | `edit`, `view`, or `hidden` |
+| `tool` | App → layer | `select`, `pen`, `arrow`, `rectangle`, or `ellipse` |
+| `color` | App → layer | Color used for newly created shapes |
+| `strokeWidth` | App → layer | Stroke width used for newly created shapes |
+| `annotations` | Both ways | Current JSON-serializable list of annotations |
+| `selectedId` | Both ways | ID of the selected annotation, or `None` |
+
+When a user finishes drawing, moves a shape, selects or deselects a shape, or deletes one, the React component calls Dash's `setProps` to update the relevant properties. Dash can then use those property changes as callback inputs. Conversely, a callback can update a property—for example, the demo's Clear button sends an empty annotation list back to the component.
+
+The demo wires its toolbar controls to layer properties with callbacks:
+
+| Input | Output | Effect |
+| --- | --- | --- |
+| Mode control value | `annotation-layer.mode` | Switches between Edit, View, and Hidden |
+| Tool control value | `annotation-layer.tool` | Chooses Select, Pen, Arrow, Rectangle, or Ellipse |
+| Color input value | `annotation-layer.color` | Sets the color for new annotations |
+| Stroke slider value | `annotation-layer.strokeWidth` | Sets the stroke width for new annotations |
+| Clear button clicks | `annotation-layer.annotations` | Replaces the annotation list with an empty list |
+| `annotation-layer.annotations` | JSON display | Pretty-prints the current annotation list |
+
+The annotations display callback reads the component's property and renders it as formatted JSON:
+
+```python
+@callback(
+    Output("annotation-json", "children"),
+    Input("annotation-layer", "annotations"),
+)
+def show_annotations(annotations):
+    return json.dumps(annotations or [], indent=2)
+```
+
+To respond to selection in your own app, use `selectedId` as a callback input in the same way:
+
+```python
+@callback(
+    Output("selection-message", "children"),
+    Input("annotation-layer", "selectedId"),
+)
+def show_selected_annotation(selected_id):
+    return f"Selected annotation: {selected_id or 'None'}"
+```
+
+The demo displays the annotations list but does not currently display the selected ID. Its other callbacks, for the live counter and selected subsystem, are ordinary workspace callbacks and are independent of the annotation layer.
+
 ## Annotation JSON
 
 Coordinates are pixel offsets within the annotated region. Every annotation has `id`, `type`, `color`, and `strokeWidth`. The remaining fields are:
@@ -51,7 +112,7 @@ Coordinates are pixel offsets within the annotated region. Every annotation has 
 {"id":"ellipse-uuid","type":"ellipse","color":"#e03131","strokeWidth":3,"x":52,"y":39,"radiusX":40,"radiusY":21}
 ```
 
-Committed edits are passed to Dash through `setProps` as JSON-serializable values; freehand pointer movement stays local to React until the stroke completes. The demo displays the component's annotations property as JSON.
+The annotation list contains JSON-serializable values, so it can be displayed, stored, or processed by ordinary Dash callbacks. The demo's JSON panel is one example of reading that property.
 
 ## Manual browser checklist
 
