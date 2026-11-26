@@ -48,6 +48,7 @@ interface ShapeProps {
   onSelect: (id: string) => void;
   onDragEnd: (annotation: Annotation, node: Konva.Node) => void;
   onTransformEnd: (annotation: Annotation, node: Konva.Node) => void;
+  onAnchorDragEnd: (annotation: CalloutAnnotation, node: Konva.Node) => void;
   onEditText: (annotation: Annotation) => void;
   onNodeRef: (id: string, node: Konva.Node | null) => void;
 }
@@ -167,6 +168,59 @@ function makeShapeLabel(color: string, fontSize: number): ShapeLabel {
   };
 }
 
+function wrappedLineCount(
+  text: string,
+  width: number,
+  fontSize: number,
+): number {
+  if (typeof document === "undefined") {
+    return Math.max(1, text.split("\n").length);
+  }
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return Math.max(1, text.split("\n").length);
+  context.font = `${fontSize}px Arial`;
+  const availableWidth = Math.max(1, width - 16);
+  let total = 0;
+  for (const paragraph of text.split("\n")) {
+    if (!paragraph) {
+      total += 1;
+      continue;
+    }
+    let lines = 1;
+    let lineWidth = 0;
+    for (const word of paragraph.split(/\s+/)) {
+      const wordWidth = context.measureText(
+        `${lineWidth ? word : ` ${word}`}`,
+      ).width;
+      if (lineWidth && lineWidth + wordWidth > availableWidth) {
+        lines += 1;
+        lineWidth = context.measureText(word).width;
+      } else {
+        lineWidth += wordWidth;
+      }
+    }
+    total += lines;
+  }
+  return Math.max(1, total);
+}
+
+function requiredCalloutHeight(
+  annotation: Pick<CalloutAnnotation, "text" | "fontSize" | "width">,
+): number {
+  return Math.max(
+    60,
+    wrappedLineCount(
+      annotation.text,
+      annotation.width,
+      annotation.fontSize,
+    ) *
+      annotation.fontSize *
+      1.3 +
+      16,
+  );
+}
+
 function labelY(
   verticalAlign: ShapeLabel["verticalAlign"],
   y: number,
@@ -189,26 +243,6 @@ function contrastingTextColor(color: string): string {
     : "#ffffff";
 }
 
-function calloutConnector(annotation: CalloutAnnotation): [number, number] {
-  const anchorX = annotation.anchorX - annotation.x;
-  const anchorY = annotation.anchorY - annotation.y;
-  const relativeX = anchorX - annotation.width / 2;
-  const relativeY = anchorY - annotation.height / 2;
-  const horizontal =
-    Math.abs(relativeX) / Math.max(annotation.width, 1) >=
-    Math.abs(relativeY) / Math.max(annotation.height, 1);
-  if (horizontal) {
-    return [
-      relativeX < 0 ? 0 : annotation.width,
-      Math.max(0, Math.min(annotation.height, anchorY)),
-    ];
-  }
-  return [
-    Math.max(0, Math.min(annotation.width, anchorX)),
-    relativeY < 0 ? 0 : annotation.height,
-  ];
-}
-
 function AnnotationShape({
   annotation,
   mode,
@@ -217,9 +251,14 @@ function AnnotationShape({
   onSelect,
   onDragEnd,
   onTransformEnd,
+  onAnchorDragEnd,
   onEditText,
   onNodeRef,
 }: ShapeProps): React.ReactElement {
+  const [anchorPreview, setAnchorPreview] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const draggable = mode === "edit" && tool === "select";
   const center = annotationCenter(annotation);
   const eventProps = {
@@ -245,6 +284,9 @@ function AnnotationShape({
     scaleX: annotation.scaleX ?? 1,
     scaleY: annotation.scaleY ?? 1,
   };
+  useEffect(() => {
+    if (annotation.type === "callout") setAnchorPreview(null);
+  }, [annotation]);
 
   switch (annotation.type) {
     case "pen":
@@ -405,45 +447,65 @@ function AnnotationShape({
         </Group>
       );
     case "callout":
-      const [connectorX, connectorY] = calloutConnector(annotation);
       const bodyX = -annotation.width / 2;
       const bodyY = -annotation.height / 2;
+      const anchorX = anchorPreview?.x ?? annotation.anchorX;
+      const anchorY = anchorPreview?.y ?? annotation.anchorY;
       return (
-        <Group {...groupProps}>
+        <>
           <Line
-            points={[
-              annotation.anchorX - center.x,
-              annotation.anchorY - center.y,
-              connectorX + bodyX,
-              connectorY + bodyY,
-            ]}
+            points={[anchorX, anchorY, center.x, center.y]}
             stroke={annotation.color}
             strokeWidth={annotation.strokeWidth}
             lineCap="round"
-          />
-          <Rect
-            x={bodyX}
-            y={bodyY}
-            width={annotation.width}
-            height={annotation.height}
-            cornerRadius={8}
-            fill={annotation.fillColor}
-            stroke={annotation.color}
-            strokeWidth={annotation.strokeWidth}
-          />
-          <Text
-            x={bodyX + 8}
-            y={bodyY + 8}
-            width={Math.max(0, annotation.width - 16)}
-            height={Math.max(0, annotation.height - 16)}
-            text={annotation.text}
-            fontSize={annotation.fontSize}
-            fill={annotation.color}
-            padding={0}
-            wrap="word"
             listening={false}
           />
-        </Group>
+          <Group {...groupProps}>
+            <Rect
+              x={bodyX}
+              y={bodyY}
+              width={annotation.width}
+              height={annotation.height}
+              cornerRadius={8}
+              fill={annotation.fillColor}
+              stroke={annotation.color}
+              strokeWidth={annotation.strokeWidth}
+            />
+            <Text
+              x={bodyX + 8}
+              y={bodyY + 8}
+              width={Math.max(0, annotation.width - 16)}
+              text={annotation.text}
+              fontSize={annotation.fontSize}
+              fill={annotation.color}
+              padding={0}
+              wrap="word"
+              listening={false}
+            />
+          </Group>
+          {selected && tool === "select" && mode === "edit" && (
+            <Circle
+              x={annotation.anchorX}
+              y={annotation.anchorY}
+              radius={7}
+              fill="#ffffff"
+              stroke="#228be6"
+              strokeWidth={2}
+              draggable
+              hitStrokeWidth={12}
+              onMouseDown={(event) => event.cancelBubble = true}
+              onTouchStart={(event) => event.cancelBubble = true}
+              onDragMove={(event) =>
+                setAnchorPreview(event.target.position())
+              }
+              onDragEnd={(event) => {
+                event.cancelBubble = true;
+                setAnchorPreview(null);
+                onAnchorDragEnd(annotation, event.target);
+              }}
+            />
+          )}
+        </>
       );
   }
 }
@@ -825,11 +887,109 @@ function AnnotationLayer({
     [commitAnnotations],
   );
 
+  const handleAnchorDragEnd = useCallback(
+    (annotation: CalloutAnnotation, node: Konva.Node) => {
+      const { x, y } = node.position();
+      commitAnnotations(
+        annotationsRef.current.map((item) =>
+          item.id === annotation.id && item.type === "callout"
+            ? { ...item, anchorX: x, anchorY: y }
+            : item,
+        ),
+      );
+      node.position({ x: annotation.anchorX, y: annotation.anchorY });
+    },
+    [commitAnnotations],
+  );
+
   const handleTransformEnd = useCallback(
     (annotation: Annotation, node: Konva.Node) => {
       const scaleX = Math.max(0.1, node.scaleX());
       const scaleY = Math.max(0.1, node.scaleY());
       const rotation = node.rotation();
+      const reflowText =
+        annotation.textResizeMode !== "scale" &&
+        (annotation.type === "text" ||
+          annotation.type === "callout" ||
+          ((annotation.type === "rectangle" ||
+            annotation.type === "ellipse") &&
+            Boolean(annotation.label)));
+
+      if (reflowText) {
+        const transformedCenter = node.position();
+        node.scale({ x: 1, y: 1 });
+        commitAnnotations(
+          annotationsRef.current.map((item) => {
+            if (item.id !== annotation.id) return item;
+            if (item.type === "text") {
+              const width = Math.max(40, item.width * scaleX);
+              const textHeight =
+                wrappedLineCount(item.text, width, item.fontSize) *
+                item.fontSize *
+                1.3;
+              return {
+                ...item,
+                x: transformedCenter.x - width / 2,
+                y: transformedCenter.y - textHeight / 2,
+                width,
+                rotation,
+                scaleX: 1,
+                scaleY: 1,
+              };
+            }
+            if (item.type === "callout") {
+              const width = Math.max(120, item.width * scaleX);
+              const resized = {
+                ...item,
+                width,
+                height: Math.max(
+                  60,
+                  requiredCalloutHeight({ ...item, width }),
+                  item.height * scaleY,
+                ),
+                x: 0,
+                y: 0,
+                rotation,
+                scaleX: 1,
+                scaleY: 1,
+              };
+              return {
+                ...resized,
+                x: transformedCenter.x - resized.width / 2,
+                y: transformedCenter.y - resized.height / 2,
+              };
+            }
+            if (item.type === "rectangle" && item.label) {
+              const width = Math.max(40, item.width * scaleX);
+              const height = Math.max(40, item.height * scaleY);
+              return {
+                ...item,
+                x: transformedCenter.x - width / 2,
+                y: transformedCenter.y - height / 2,
+                width,
+                height,
+                rotation,
+                scaleX: 1,
+                scaleY: 1,
+              };
+            }
+            if (item.type === "ellipse" && item.label) {
+              return {
+                ...item,
+                x: transformedCenter.x,
+                y: transformedCenter.y,
+                radiusX: Math.max(20, item.radiusX * scaleX),
+                radiusY: Math.max(20, item.radiusY * scaleY),
+                rotation,
+                scaleX: 1,
+                scaleY: 1,
+              };
+            }
+            return item;
+          }),
+        );
+        return;
+      }
       commitAnnotations(
         annotationsRef.current.map((item) =>
           item.id === annotation.id
@@ -973,7 +1133,11 @@ function AnnotationLayer({
       annotationsRef.current.map((item) => {
         if (item.id !== annotation.id) return item;
         if (kind === "callout" && item.type === "callout") {
-          return { ...item, text };
+          const updated = { ...item, text };
+          return {
+            ...updated,
+            height: Math.max(item.height, requiredCalloutHeight(updated)),
+          };
         }
         if (item.type === "rectangle" || item.type === "ellipse") {
           const original = annotation as RectangleAnnotation | EllipseAnnotation;
@@ -1048,11 +1212,15 @@ function AnnotationLayer({
         transformOrigin: "center center",
       };
     } else if (annotation.type === "callout") {
+      const editorHeight = requiredCalloutHeight({
+        ...annotation,
+        text: textEditor.value,
+      });
       editorStyle = {
         left: annotation.x + 8,
         top: annotation.y + 8,
         width: Math.max(80, annotation.width - 16),
-        height: Math.max(40, annotation.height - 16),
+        height: Math.max(40, editorHeight - 16),
         fontSize: annotation.fontSize,
         color: annotation.color,
         transform: `rotate(${annotation.rotation ?? 0}deg) scale(${annotation.scaleX ?? 1}, ${annotation.scaleY ?? 1})`,
@@ -1148,6 +1316,7 @@ function AnnotationLayer({
               onSelect={changeSelection}
               onDragEnd={handleDragEnd}
               onTransformEnd={handleTransformEnd}
+              onAnchorDragEnd={handleAnchorDragEnd}
               onEditText={handleEditText}
               onNodeRef={handleNodeRef}
             />

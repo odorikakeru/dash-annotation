@@ -89,6 +89,7 @@ type AnnotationLayerAnnotationKeys = Literal[
     "rotation",
     "scaleX",
     "scaleY",
+    "textResizeMode",
 ]
 """Annotation layer annotation dictionary keys."""
 
