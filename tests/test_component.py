@@ -140,3 +140,28 @@ def test_annotation_layer_supports_external_history():
     assert component.canUndo is True
     assert component.canRedo is True
     json.dumps(component.to_plotly_json())
+
+
+def test_annotation_layer_preserves_text_resize_mode():
+    annotation = {
+        "id": "callout-1",
+        "type": "callout",
+        "x": 10,
+        "y": 20,
+        "width": 180,
+        "height": 80,
+        "anchorX": 5,
+        "anchorY": 5,
+        "text": "Scaled callout",
+        "fillColor": "#ffffff",
+        "fontSize": 18,
+        "color": "#e03131",
+        "strokeWidth": 3,
+        "textResizeMode": "scale",
+        "scaleX": 1.5,
+    }
+
+    component = AnnotationLayer(id="annotations", annotations=[annotation])
+
+    assert component.annotations == [annotation]
+    json.dumps(component.to_plotly_json())

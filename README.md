@@ -57,8 +57,10 @@ Text, Pins, and Callouts use click-oriented interactions:
 - **Shape labels** — With Select active, double-click a Rectangle or Ellipse to add or edit its label.
 - **Pin** — Click to place the lowest available positive number.
 - **Callout** — Drag a callout box, then edit its text. Its leader remains anchored at the start of the drag.
+- **Callout anchor** — When a callout is selected, drag the blue-and-white anchor handle to move its pointed-to location independently of the bubble.
 - **Editing existing text** — Double-click standalone Text or a Callout in Select mode.
 - **Resize and rotate** — In Select mode, use the handles around the selected annotation. Transform settings are stored as `scaleX`, `scaleY`, and `rotation`.
+- **Text-containing resize** — Callouts, standalone text, and labeled shapes reflow at a fixed font size when resized. Resizing changes their text area rather than stretching letters. Callouts grow vertically when text would otherwise be clipped.
 - **Edit color or font size** — Select an annotation, then change the demo's Color or Font size control. Text size changes apply to text, callouts, and existing shape labels.
 - **Undo and redo** — Use Ctrl/Cmd+Z to undo, and Ctrl/Cmd+Shift+Z or Ctrl+Y to redo. History is kept for edits made during the current browser session.
 - **Dash history controls** — Apps can increment `undoRequest`, `redoRequest`, or `clearHistoryRequest` from ordinary callbacks. `canUndo` and `canRedo` expose whether the commands are currently available.
@@ -138,6 +140,11 @@ Coordinates are pixel offsets within the annotated region. Every annotation has 
 {"id":"callout-uuid","type":"callout","color":"#e03131","strokeWidth":3,"x":120,"y":90,"width":180,"height":70,"anchorX":60,"anchorY":55,"text":"Investigate","fillColor":"#ffffff","fontSize":18}
 ```
 
+Text-bearing annotations default to `textResizeMode: "reflow"`. Advanced
+Python developers can explicitly set `textResizeMode: "scale"` in annotation
+JSON to retain scale-based distortion. The demo and normal UI intentionally
+do not expose this experimental backend option.
+
 Rectangles and ellipses can additionally contain an optional `label`:
 
 ```json
@@ -185,6 +192,7 @@ communicates that undo/redo is intentionally unavailable.
 6. Create and edit standalone Text, double-click a rectangle to add a label, create a Callout, and place multiple Pins. Confirm deletion and numbering behavior in JSON.
 7. Select an annotation, resize and rotate it with the handles, change its color/font size, then undo and redo the edits.
 8. Use the demo Undo/Redo/Clear history buttons and change the history mode. External and disabled modes should leave history controls unavailable.
+9. Select a callout, move its bubble, and move its anchor handle independently. Confirm the pointed-to coordinate stays fixed during bubble movement.
 
 ## Known limitations
 
