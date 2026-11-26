@@ -100,8 +100,6 @@ export function movedAnnotation(
       ...annotation,
       x: annotation.x + x,
       y: annotation.y + y,
-      anchorX: annotation.anchorX + x,
-      anchorY: annotation.anchorY + y,
     };
   }
   return { ...annotation, x: annotation.x + x, y: annotation.y + y };

@@ -32,6 +32,7 @@ interface BaseAnnotation {
   rotation?: number;
   scaleX?: number;
   scaleY?: number;
+  textResizeMode?: "reflow" | "scale";
 }
 
 export interface PenAnnotation extends BaseAnnotation {
