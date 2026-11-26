@@ -12,6 +12,7 @@ from dash import Input, Output, callback, dcc, html
 from dash_konva_annotation import (
     AnnotationLayer,
     AnnotationLayerAnnotation,
+    AnnotationLayerHistoryMode,
     AnnotationLayerMode,
     AnnotationLayerTool,
 )
@@ -75,8 +76,16 @@ app.layout = dmc.MantineProvider(
                                     {"label": "Select", "value": "select"},
                                     {"label": "Pen", "value": "pen"},
                                     {"label": "Arrow", "value": "arrow"},
+                                    {"label": "Line", "value": "line"},
+                                    {
+                                        "label": "Highlighter",
+                                        "value": "highlighter",
+                                    },
                                     {"label": "Rectangle", "value": "rectangle"},
                                     {"label": "Ellipse", "value": "ellipse"},
+                                    {"label": "Text", "value": "text"},
+                                    {"label": "Pin", "value": "pin"},
+                                    {"label": "Callout", "value": "callout"},
                                 ],
                             ),
                             dmc.ColorInput(
@@ -99,11 +108,55 @@ app.layout = dmc.MantineProvider(
                                 ],
                                 gap=2,
                             ),
+                            dmc.Stack(
+                                [
+                                    dmc.Text("Font size", size="sm"),
+                                    dmc.Slider(
+                                        id="font-size-control",
+                                        min=10,
+                                        max=48,
+                                        step=1,
+                                        value=18,
+                                        w=180,
+                                    ),
+                                ],
+                                gap=2,
+                            ),
                             dmc.Button(
                                 "Clear annotations",
                                 id="clear-button",
                                 color="red",
                                 variant="light",
+                            ),
+                            dmc.Button(
+                                "Undo",
+                                id="undo-button",
+                                variant="light",
+                                disabled=True,
+                            ),
+                            dmc.Button(
+                                "Redo",
+                                id="redo-button",
+                                variant="light",
+                                disabled=True,
+                            ),
+                            dmc.Button(
+                                "Clear history",
+                                id="clear-history-button",
+                                variant="subtle",
+                                disabled=True,
+                            ),
+                            dmc.SegmentedControl(
+                                id="history-control",
+                                value="local",
+                                data=[
+                                    {"label": "Local history", "value": "local"},
+                                    {
+                                        "label": "Dash history",
+                                        "value": "external",
+                                    },
+                                    {"label": "No history", "value": "disabled"},
+                                ],
                             ),
                         ],
                         align="end",
@@ -254,6 +307,7 @@ app.layout = dmc.MantineProvider(
                         annotations=[],
                         color="#e03131",
                         strokeWidth=3,
+                        fontSize=18,
                         selectedId=None,
                     ),
                 ],
@@ -304,12 +358,75 @@ def update_stroke_width(width: float) -> float:
 
 
 @callback(
+    Output("annotation-layer", "fontSize"),
+    Input("font-size-control", "value"),
+)
+def update_font_size(size: float) -> float:
+    return size
+
+
+@callback(
     Output("annotation-layer", "annotations"),
     Input("clear-button", "n_clicks"),
     prevent_initial_call=True,
 )
 def clear_annotations(_clicks) -> list[dict[str, Any]]:
     return []
+
+
+@callback(
+    Output("annotation-layer", "history"),
+    Input("history-control", "value"),
+)
+def update_history_mode(
+    history: AnnotationLayerHistoryMode,
+) -> AnnotationLayerHistoryMode:
+    return history
+
+
+@callback(
+    Output("annotation-layer", "undoRequest"),
+    Input("undo-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def request_undo(clicks: int) -> int:
+    return clicks
+
+
+@callback(
+    Output("annotation-layer", "redoRequest"),
+    Input("redo-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def request_redo(clicks: int) -> int:
+    return clicks
+
+
+@callback(
+    Output("annotation-layer", "clearHistoryRequest"),
+    Input("clear-history-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def request_clear_history(clicks: int) -> int:
+    return clicks
+
+
+@callback(
+    Output("undo-button", "disabled"),
+    Output("redo-button", "disabled"),
+    Output("clear-history-button", "disabled"),
+    Input("annotation-layer", "canUndo"),
+    Input("annotation-layer", "canRedo"),
+)
+def update_history_buttons(
+    can_undo: bool | None,
+    can_redo: bool | None,
+) -> tuple[bool, bool, bool]:
+    undo_available = bool(can_undo)
+    redo_available = bool(can_redo)
+    return not undo_available, not redo_available, not (
+        undo_available or redo_available
+    )
 
 
 @callback(

@@ -35,21 +35,34 @@ Open the local URL printed by Dash. The demo sets `REACT_VERSION=19.2.4` before 
 ## Interaction modes
 
 - **Edit** — Annotations are visible and interactive. The overlay captures pointer input, so the live workspace is visible but cannot be operated. Choose a drawing tool to create an annotation or Select to drag/delete one.
-- **View** — Annotations remain visible but the overlay's DOM container uses `pointer-events: none`; clicks, hover, scroll, and graph interactions pass to the workspace. Annotations cannot be selected or moved.
+- **View** — Annotations remain visible but the overlay's DOM container uses `pointer-events: none`; clicks, hover, scroll, and graph interactions pass to the workspace. Entering View clears the current selection, and annotations cannot be selected or moved.
 - **Hidden** — The overlay uses `display: none`. The annotations remain in Dash state and return when the layer is shown again.
 
-The toolbar offers Select, Pen, Arrow, Rectangle, and Ellipse; color, stroke width, and Clear annotations are also available. Deleting the selected annotation uses Delete or Backspace, except when focus is in an input, textarea, select, or content-editable element.
+The toolbar offers Select, Pen, Arrow, Line, Highlighter, Rectangle, Ellipse, Text, Pin, and Callout. Color, stroke width, font size, and Clear annotations are also available. Deleting the selected annotation uses Delete or Backspace, except when focus is in an input, textarea, select, or content-editable element.
 
 ### What happens during an interaction?
 
 In Edit mode, the layer listens to pointer events on its Konva canvas:
 
 1. Pointer down on empty canvas starts a draft at that position. With Select active, clicking empty canvas instead clears the current selection.
-2. Pointer movement updates the draft locally in the browser. Pen records a series of points; Arrow tracks its start and end; Rectangle and Ellipse calculate their bounds from the drag.
+2. Pointer movement updates the draft locally in the browser. Pen and Highlighter record a series of points; Arrow and Line track their endpoints; Rectangle, Ellipse, and Callout calculate their bounds from the drag.
 3. Pointer up completes the shape. Tiny or zero-size gestures are ignored. A valid shape is added to `annotations` and becomes selected.
 4. With Select active, clicking an existing shape selects it and dragging it moves it. Delete or Backspace removes the selected shape.
 
 The layer does not send every pointer movement to Python. It keeps an in-progress draft in React, then reports committed annotation changes and selection changes to Dash. This keeps drawing responsive while still making completed edits available to Dash callbacks.
+
+Text, Pins, and Callouts use click-oriented interactions:
+
+- **Text** — Click to place a text editor. Enter commits, Shift+Enter inserts a newline, and Escape cancels.
+- **Shape labels** — With Select active, double-click a Rectangle or Ellipse to add or edit its label.
+- **Pin** — Click to place the lowest available positive number.
+- **Callout** — Drag a callout box, then edit its text. Its leader remains anchored at the start of the drag.
+- **Editing existing text** — Double-click standalone Text or a Callout in Select mode.
+- **Resize and rotate** — In Select mode, use the handles around the selected annotation. Transform settings are stored as `scaleX`, `scaleY`, and `rotation`.
+- **Edit color or font size** — Select an annotation, then change the demo's Color or Font size control. Text size changes apply to text, callouts, and existing shape labels.
+- **Undo and redo** — Use Ctrl/Cmd+Z to undo, and Ctrl/Cmd+Shift+Z or Ctrl+Y to redo. History is kept for edits made during the current browser session.
+- **Dash history controls** — Apps can increment `undoRequest`, `redoRequest`, or `clearHistoryRequest` from ordinary callbacks. `canUndo` and `canRedo` expose whether the commands are currently available.
+- **History ownership** — `history="local"` keeps browser-side snapshots. Use `history="external"` when Dash owns restoration, or `history="disabled"` when history is not available.
 
 ## Props and callbacks
 
@@ -58,11 +71,18 @@ The layer does not send every pointer movement to Python. It keeps an in-progres
 | Property | Direction | Meaning |
 | --- | --- | --- |
 | `mode` | App → layer | `edit`, `view`, or `hidden` |
-| `tool` | App → layer | `select`, `pen`, `arrow`, `rectangle`, or `ellipse` |
+| `tool` | App → layer | `select`, `pen`, `arrow`, `line`, `highlighter`, `rectangle`, `ellipse`, `text`, `pin`, or `callout` |
 | `color` | App → layer | Color used for newly created shapes |
 | `strokeWidth` | App → layer | Stroke width used for newly created shapes |
+| `fontSize` | App → layer | Font size for new Text, labels, and Callouts |
 | `annotations` | Both ways | Current JSON-serializable list of annotations |
 | `selectedId` | Both ways | ID of the selected annotation, or `None` |
+| `history` | App → layer | `local`, `external`, or `disabled` |
+| `undoRequest` | App → layer | Increment to perform one local undo |
+| `redoRequest` | App → layer | Increment to perform one local redo |
+| `clearHistoryRequest` | App → layer | Increment to clear local history without changing annotations |
+| `canUndo` | Layer → app | Whether a local undo is available |
+| `canRedo` | Layer → app | Whether a local redo is available |
 
 When a user finishes drawing, moves a shape, selects or deselects a shape, or deletes one, the React component calls Dash's `setProps` to update the relevant properties. Dash can then use those property changes as callback inputs. Conversely, a callback can update a property—for example, the demo's Clear button sends an empty annotation list back to the component.
 
@@ -71,9 +91,10 @@ The demo wires its toolbar controls to layer properties with callbacks:
 | Input | Output | Effect |
 | --- | --- | --- |
 | Mode control value | `annotation-layer.mode` | Switches between Edit, View, and Hidden |
-| Tool control value | `annotation-layer.tool` | Chooses Select, Pen, Arrow, Rectangle, or Ellipse |
+| Tool control value | `annotation-layer.tool` | Chooses the active annotation tool |
 | Color input value | `annotation-layer.color` | Sets the color for new annotations |
 | Stroke slider value | `annotation-layer.strokeWidth` | Sets the stroke width for new annotations |
+| Font size slider value | `annotation-layer.fontSize` | Sets the font size for text annotations |
 | Clear button clicks | `annotation-layer.annotations` | Replaces the annotation list with an empty list |
 | `annotation-layer.annotations` | JSON display | Pretty-prints the current annotation list |
 
@@ -108,25 +129,69 @@ Coordinates are pixel offsets within the annotated region. Every annotation has 
 ```json
 {"id":"pen-uuid","type":"pen","color":"#e03131","strokeWidth":3,"points":[12,18,24,30]}
 {"id":"arrow-uuid","type":"arrow","color":"#e03131","strokeWidth":3,"points":[12,18,80,60]}
+{"id":"line-uuid","type":"line","color":"#e03131","strokeWidth":3,"points":[12,18,80,60]}
+{"id":"highlighter-uuid","type":"highlighter","color":"#ffd43b","strokeWidth":3,"opacity":0.35,"points":[12,18,24,30]}
 {"id":"rectangle-uuid","type":"rectangle","color":"#e03131","strokeWidth":3,"x":12,"y":18,"width":80,"height":42}
 {"id":"ellipse-uuid","type":"ellipse","color":"#e03131","strokeWidth":3,"x":52,"y":39,"radiusX":40,"radiusY":21}
+{"id":"text-uuid","type":"text","color":"#e03131","strokeWidth":3,"x":12,"y":18,"width":180,"text":"Review this","fontSize":18,"fontFamily":"Arial","align":"left"}
+{"id":"pin-uuid","type":"pin","color":"#e03131","strokeWidth":3,"x":52,"y":39,"number":1,"radius":16}
+{"id":"callout-uuid","type":"callout","color":"#e03131","strokeWidth":3,"x":120,"y":90,"width":180,"height":70,"anchorX":60,"anchorY":55,"text":"Investigate","fillColor":"#ffffff","fontSize":18}
+```
+
+Rectangles and ellipses can additionally contain an optional `label`:
+
+```json
+{"text":"Peak response","color":"#111111","fontSize":16,"align":"center","verticalAlign":"middle","padding":8}
 ```
 
 The annotation list contains JSON-serializable values, so it can be displayed, stored, or processed by ordinary Dash callbacks. The demo's JSON panel is one example of reading that property.
 
+The history buttons use ordinary Dash counters:
+
+```python
+@callback(
+    Output("annotation-layer", "undoRequest"),
+    Input("undo-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def request_undo(clicks: int) -> int:
+    return clicks
+```
+
+Use capability state to control the buttons:
+
+```python
+@callback(
+    Output("undo-button", "disabled"),
+    Input("annotation-layer", "canUndo"),
+)
+def disable_undo(can_undo: bool | None) -> bool:
+    return not bool(can_undo)
+```
+
+In `external` mode, React emits annotation updates but retains no history and
+ignores local history commands. Dash code must distinguish its own snapshot
+restoration from user edits so an undo operation is not appended as a new
+history entry. `disabled` mode behaves the same at the component boundary, but
+communicates that undo/redo is intentionally unavailable.
+
 ## Manual browser checklist
 
 1. In Edit/Pen, draw across the DMC card and Plotly graph; they should stay visible underneath, and their controls should not respond.
-2. Select Edit/Rectangle, Arrow, or Ellipse and draw; then use Select to drag an annotation and Delete to remove it. Confirm the JSON display changes.
-3. In View, confirm annotations remain visible while the button, DMC controls, scrolling, and Plotly interactions work through them.
+2. Select Edit/Line, Highlighter, Rectangle, Arrow, or Ellipse and draw; then use Select to drag an annotation and Delete to remove it. Confirm the JSON display changes.
+3. Select an annotation, switch to View, and confirm its selection highlight disappears. Confirm annotations remain visible while the button, DMC controls, scrolling, and Plotly interactions work through them.
 4. In Hidden, confirm drawings disappear and workspace controls remain interactive; switch back to Edit and confirm drawings return.
 5. Expand/collapse the workspace accordion and resize the browser; the overlay should continue covering the workspace.
+6. Create and edit standalone Text, double-click a rectangle to add a label, create a Callout, and place multiple Pins. Confirm deletion and numbering behavior in JSON.
+7. Select an annotation, resize and rotate it with the handles, change its color/font size, then undo and redo the edits.
+8. Use the demo Undo/Redo/Clear history buttons and change the history mode. External and disabled modes should leave history controls unavailable.
 
 ## Known limitations
 
 - Coordinates are pixel-relative to the overlay container; major responsive reflow may misalign existing drawings.
 - There is no DOM-element anchoring or automatic repositioning.
 - Annotations are not semantically anchored to Plotly data and do not follow Plotly pan/zoom.
-- There is no persistence, collaboration, image/PDF export, text annotation, or full-page annotation.
-- Selection supports dragging and deletion, but not resize handles or sophisticated editing.
+- There is no persistence, collaboration, image/PDF export, or full-page annotation.
+- Selection supports dragging, resizing, rotation, deletion, and basic text/color editing.
 - The package targets a defined, positioned workspace; place `AnnotationLayer` inside a parent with `position: relative`.
+- Polygon annotations and blur are deferred in issues #4 and #3, respectively.
