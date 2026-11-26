@@ -29,18 +29,66 @@ type AnnotationLayerMode = Literal["view", "edit", "hidden"]
 - "hidden": The layer is hidden.
 """
 
-type AnnotationLayerTool = Literal["select", "pen", "arrow", "rectangle", "ellipse"]
+type AnnotationLayerHistoryMode = Literal["local", "external", "disabled"]
+"""Annotation history ownership mode.
+
+- "local": React records edits and supports keyboard and callback-driven history.
+- "external": Dash/Python owns history and React records no snapshots.
+- "disabled": History is unavailable.
+"""
+
+type AnnotationLayerTool = Literal[
+    "select",
+    "pen",
+    "arrow",
+    "line",
+    "highlighter",
+    "rectangle",
+    "ellipse",
+    "text",
+    "pin",
+    "callout",
+]
 """Annotation layer interaction tools.
 
 - "select": The selection tool.
 - "pen": The freehand drawing tool.
 - "arrow": The arrow annotation tool.
+- "line": The straight-line annotation tool.
+- "highlighter": The translucent, wide-stroke highlighting tool.
 - "rectangle": The rectangle annotation tool.
 - "ellipse": The ellipse annotation tool.
+- "text": The standalone text tool.
+- "pin": The automatically numbered pin tool.
+- "callout": The anchored text callout tool.
 """
 
 type AnnotationLayerAnnotationKeys = Literal[
-    "id", "type", "x", "y", "width", "height", "points", "color", "strokeWidth"
+    "id",
+    "type",
+    "x",
+    "y",
+    "width",
+    "height",
+    "points",
+    "color",
+    "strokeWidth",
+    "opacity",
+    "fontSize",
+    "fontFamily",
+    "align",
+    "text",
+    "label",
+    "radius",
+    "radiusX",
+    "radiusY",
+    "number",
+    "anchorX",
+    "anchorY",
+    "fillColor",
+    "rotation",
+    "scaleX",
+    "scaleY",
 ]
 """Annotation layer annotation dictionary keys."""
 
@@ -62,7 +110,14 @@ class AnnotationLayer(Component):
         "annotations",
         "color",
         "strokeWidth",
+        "fontSize",
         "selectedId",
+        "history",
+        "undoRequest",
+        "redoRequest",
+        "clearHistoryRequest",
+        "canUndo",
+        "canRedo",
         "className",
         "style",
     ]
@@ -78,7 +133,14 @@ class AnnotationLayer(Component):
         annotations: list[dict[str, Any]] | None = None,
         color: str = "#e03131",
         strokeWidth: float = 3,
+        fontSize: float = 18,
         selectedId: str | None = None,
+        history: AnnotationLayerHistoryMode = "local",
+        undoRequest: int = 0,
+        redoRequest: int = 0,
+        clearHistoryRequest: int = 0,
+        canUndo: bool = False,
+        canRedo: bool = False,
         className: str | None = None,
         style: dict[str, Any] | None = None,
         **kwargs: Any,
@@ -89,8 +151,7 @@ class AnnotationLayer(Component):
         :type id: str | dict[str, Any] | None
         :param mode: The interaction mode: "view", "edit", or "hidden".
         :type mode: AnnotationLayerMode
-        :param tool: The active interaction tool: "select", "pen", "arrow",
-            "rectangle", or "ellipse".
+        :param tool: The active interaction tool.
         :type tool: AnnotationLayerTool
         :param annotations: JSON-serializable annotation dictionaries to render.
         :type annotations: list[dict[str, Any]] | None
@@ -98,8 +159,23 @@ class AnnotationLayer(Component):
         :type color: str
         :param strokeWidth: The default stroke width for annotations.
         :type strokeWidth: int | float
+        :param fontSize: The default text font size in pixels.
+        :type fontSize: int | float
         :param selectedId: The ID of the selected annotation, or None.
         :type selectedId: str | None
+        :param history: History ownership mode: "local", "external", or
+            "disabled".
+        :type history: AnnotationLayerHistoryMode
+        :param undoRequest: Increment to request one local undo operation.
+        :type undoRequest: int
+        :param redoRequest: Increment to request one local redo operation.
+        :type redoRequest: int
+        :param clearHistoryRequest: Increment to clear local undo/redo history.
+        :type clearHistoryRequest: int
+        :param canUndo: Whether local history currently supports undo.
+        :type canUndo: bool
+        :param canRedo: Whether local history currently supports redo.
+        :type canRedo: bool
         :param className: The CSS class name for the component.
         :type className: str | None
         :param style: The inline style for the component.
@@ -114,7 +190,14 @@ class AnnotationLayer(Component):
             "annotations": [] if annotations is None else annotations,
             "color": color,
             "strokeWidth": strokeWidth,
+            "fontSize": fontSize,
             "selectedId": selectedId,
+            "history": history,
+            "undoRequest": undoRequest,
+            "redoRequest": redoRequest,
+            "clearHistoryRequest": clearHistoryRequest,
+            "canUndo": canUndo,
+            "canRedo": canRedo,
             "className": className,
             "style": style,
             **kwargs,

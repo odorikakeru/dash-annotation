@@ -5,3 +5,19 @@
 .dash-konva-annotation-surface canvas {
   display: block;
 }
+
+.dash-konva-annotation-text-editor {
+  position: absolute;
+  z-index: 20;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2px 4px;
+  overflow: hidden;
+  resize: none;
+  border: 2px solid #228be6;
+  border-radius: 4px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  line-height: 1.3;
+}
