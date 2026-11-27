@@ -309,6 +309,7 @@ app.layout = dmc.MantineProvider(
                         strokeWidth=3,
                         fontSize=18,
                         selectedId=None,
+                        persistence=True,
                     ),
                 ],
                 className="annotatable-region",

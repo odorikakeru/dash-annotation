@@ -45,7 +45,7 @@ The toolbar offers Select, Pen, Arrow, Line, Highlighter, Rectangle, Ellipse, Te
 In Edit mode, the layer listens to pointer events on its Konva canvas:
 
 1. Pointer down on empty canvas starts a draft at that position. With Select active, clicking empty canvas instead clears the current selection.
-2. Pointer movement updates the draft locally in the browser. Pen and Highlighter record a series of points; Arrow and Line track their endpoints; Rectangle, Ellipse, and Callout calculate their bounds from the drag.
+2. Pointer movement updates the draft locally in the browser, coalesced to animation frames. Pen and Highlighter record a series of points; Arrow and Line track their endpoints; Rectangle, Ellipse, and Callout calculate their bounds from the drag. Transient drag movement does not call Dash's `setProps`.
 3. Pointer up completes the shape. Tiny or zero-size gestures are ignored. A valid shape is added to `annotations` and becomes selected.
 4. With Select active, clicking an existing shape selects it and dragging it moves it. Delete or Backspace removes the selected shape.
 
@@ -85,8 +85,50 @@ Text, Pins, and Callouts use click-oriented interactions:
 | `clearHistoryRequest` | App → layer | Increment to clear local history without changing annotations |
 | `canUndo` | Layer → app | Whether a local undo is available |
 | `canRedo` | Layer → app | Whether a local redo is available |
+| `persistence` | App → layer | Truthy to enable Dash persistence; changing the truthy value clears the previous persistence key |
+| `persisted_props` | App → layer | Properties eligible for persistence; defaults to `["annotations"]` |
+| `persistence_type` | App → layer | `local` (default), `session`, or `memory` browser storage |
 
 When a user finishes drawing, moves a shape, selects or deselects a shape, or deletes one, the React component calls Dash's `setProps` to update the relevant properties. Dash can then use those property changes as callback inputs. Conversely, a callback can update a property—for example, the demo's Clear button sends an empty annotation list back to the component.
+
+### Persisting annotations
+
+Enable Dash's built-in persistence with a component ID and `persistence=True`:
+
+```python
+AnnotationLayer(
+    id="annotation-layer",
+    persistence=True,
+    persistence_type="local",
+)
+```
+
+`persisted_props` defaults to `["annotations"]`, so completed annotations are
+restored from browser storage without a callback or a separate `dcc.Store`.
+Use `persistence_type="local"` for storage that survives browser restarts,
+`"session"` for the current browser-tab session, or `"memory"` for storage that
+lasts while the Dash page remains loaded.
+
+Persist additional user-editable properties by naming them explicitly:
+
+```python
+AnnotationLayer(
+    id="annotation-layer",
+    persistence="review-workspace-v1",
+    persisted_props=["annotations", "selectedId"],
+)
+```
+
+Changing the truthy `persistence` value creates a new storage key, which is
+useful when a new layout or annotation schema should ignore values saved by an
+older version. Persistence is scoped to the component ID, so a stable,
+app-unique ID is required.
+
+Only completed edits are published and persisted. Draft pointer movement,
+in-progress drags, transform previews, callout-anchor previews, and uncommitted
+text remain local React/Konva state. Navigation away from the page does not
+flush these unfinished interactions; normal commit, blur, Enter, drag-end, and
+transform-end behavior is unchanged.
 
 The demo wires its toolbar controls to layer properties with callbacks:
 
@@ -193,13 +235,14 @@ communicates that undo/redo is intentionally unavailable.
 7. Select an annotation, resize and rotate it with the handles, change its color/font size, then undo and redo the edits.
 8. Use the demo Undo/Redo/Clear history buttons and change the history mode. External and disabled modes should leave history controls unavailable.
 9. Select a callout, move its bubble, and move its anchor handle independently. Confirm the pointed-to coordinate stays fixed during bubble movement.
+10. Enable `persistence=True`, create or move annotations, and reload the page. Confirm the completed annotations are restored. Repeat with `persistence_type="session"` and a new browser session to confirm session storage is cleared, and with `"memory"` to confirm a reload clears it.
 
 ## Known limitations
 
 - Coordinates are pixel-relative to the overlay container; major responsive reflow may misalign existing drawings.
 - There is no DOM-element anchoring or automatic repositioning.
 - Annotations are not semantically anchored to Plotly data and do not follow Plotly pan/zoom.
-- There is no persistence, collaboration, image/PDF export, or full-page annotation.
+- There is no collaboration, image/PDF export, or full-page annotation.
 - Selection supports dragging, resizing, rotation, deletion, and basic text/color editing.
 - The package targets a defined, positioned workspace; place `AnnotationLayer` inside a parent with `position: relative`.
 - Polygon annotations and blur are deferred in issues #4 and #3, respectively.

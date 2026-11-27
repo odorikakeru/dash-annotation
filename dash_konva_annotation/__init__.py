@@ -37,6 +37,9 @@ type AnnotationLayerHistoryMode = Literal["local", "external", "disabled"]
 - "disabled": History is unavailable.
 """
 
+type AnnotationLayerPersistenceType = Literal["local", "session", "memory"]
+"""Dash persistence storage backends."""
+
 type AnnotationLayerTool = Literal[
     "select",
     "pen",
@@ -119,6 +122,9 @@ class AnnotationLayer(Component):
         "clearHistoryRequest",
         "canUndo",
         "canRedo",
+        "persistence",
+        "persisted_props",
+        "persistence_type",
         "className",
         "style",
     ]
@@ -142,6 +148,9 @@ class AnnotationLayer(Component):
         clearHistoryRequest: int = 0,
         canUndo: bool = False,
         canRedo: bool = False,
+        persistence: bool | str | float | None = None,
+        persisted_props: list[str] | None = None,
+        persistence_type: AnnotationLayerPersistenceType = "local",
         className: str | None = None,
         style: dict[str, Any] | None = None,
         **kwargs: Any,
@@ -177,6 +186,15 @@ class AnnotationLayer(Component):
         :type canUndo: bool
         :param canRedo: Whether local history currently supports redo.
         :type canRedo: bool
+        :param persistence: Enable Dash persistence with a truthy value. Changing
+            to a different truthy value clears the previous persisted state.
+        :type persistence: bool | str | float | None
+        :param persisted_props: Component properties Dash may persist. Defaults
+            to ``["annotations"]``.
+        :type persisted_props: list[str] | None
+        :param persistence_type: Browser storage backend: "local", "session", or
+            "memory".
+        :type persistence_type: AnnotationLayerPersistenceType
         :param className: The CSS class name for the component.
         :type className: str | None
         :param style: The inline style for the component.
@@ -199,6 +217,11 @@ class AnnotationLayer(Component):
             "clearHistoryRequest": clearHistoryRequest,
             "canUndo": canUndo,
             "canRedo": canRedo,
+            "persistence": persistence,
+            "persisted_props": (
+                ["annotations"] if persisted_props is None else persisted_props
+            ),
+            "persistence_type": persistence_type,
             "className": className,
             "style": style,
             **kwargs,
