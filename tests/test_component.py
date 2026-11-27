@@ -21,6 +21,9 @@ def test_annotation_layer_defaults_are_serializable():
         "clearHistoryRequest": 0,
         "canUndo": False,
         "canRedo": False,
+        "persistence": None,
+        "persisted_props": ["annotations"],
+        "persistence_type": "local",
         "className": None,
         "style": None,
     }
@@ -165,3 +168,29 @@ def test_annotation_layer_preserves_text_resize_mode():
 
     assert component.annotations == [annotation]
     json.dumps(component.to_plotly_json())
+
+
+def test_annotation_layer_accepts_dash_persistence_options():
+    component = AnnotationLayer(
+        id="annotations",
+        persistence="workspace-1",
+        persisted_props=["annotations", "selectedId"],
+        persistence_type="session",
+    )
+
+    assert component.persistence == "workspace-1"
+    assert component.persisted_props == ["annotations", "selectedId"]
+    assert component.persistence_type == "session"
+    json.dumps(component.to_plotly_json())
+
+
+def test_annotation_layer_supports_memory_persistence():
+    component = AnnotationLayer(
+        id="annotations",
+        persistence=True,
+        persisted_props=[],
+        persistence_type="memory",
+    )
+
+    assert component.persisted_props == []
+    assert component.persistence_type == "memory"
