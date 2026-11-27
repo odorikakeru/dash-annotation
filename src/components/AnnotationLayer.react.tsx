@@ -532,6 +532,8 @@ function AnnotationLayer({
   undoRequest = defaultProps.undoRequest!,
   redoRequest = defaultProps.redoRequest!,
   clearHistoryRequest = defaultProps.clearHistoryRequest!,
+  canUndo = defaultProps.canUndo!,
+  canRedo = defaultProps.canRedo!,
   className,
   style,
   setProps,
@@ -540,11 +542,13 @@ function AnnotationLayer({
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef(new Map<string, Konva.Node>());
   const gestureRef = useRef<Gesture | null>(null);
+  const draftFrameRef = useRef<number | null>(null);
   const textEditorRef = useRef<TextEditorState | null>(null);
   const textTimerRef = useRef<number | null>(null);
   const annotationsRef = useRef<Annotation[]>(annotations);
   const undoStackRef = useRef<Annotation[][]>([]);
   const redoStackRef = useRef<Annotation[][]>([]);
+  const publishedHistoryStateRef = useRef({ canUndo, canRedo });
   const previousStyleRef = useRef({ color, fontSize });
   const previousRequestsRef = useRef({
     undo: undoRequest,
@@ -585,7 +589,11 @@ function AnnotationLayer({
   useEffect(() => {
     if (mode === "edit") return;
     if (textTimerRef.current != null) window.clearTimeout(textTimerRef.current);
+    if (draftFrameRef.current != null) {
+      window.cancelAnimationFrame(draftFrameRef.current);
+    }
     textTimerRef.current = null;
+    draftFrameRef.current = null;
     gestureRef.current = null;
     setDraft(null);
     setTextEditor(null);
@@ -599,7 +607,11 @@ function AnnotationLayer({
       changeSelection(null);
     }
     if (textTimerRef.current != null) window.clearTimeout(textTimerRef.current);
+    if (draftFrameRef.current != null) {
+      window.cancelAnimationFrame(draftFrameRef.current);
+    }
     textTimerRef.current = null;
+    draftFrameRef.current = null;
     gestureRef.current = null;
     setDraft(null);
     setTextEditor(null);
@@ -627,10 +639,23 @@ function AnnotationLayer({
     [],
   );
 
+  useEffect(() => {
+    publishedHistoryStateRef.current = { canUndo, canRedo };
+  }, [canUndo, canRedo]);
+
   const publishHistoryState = useCallback(() => {
-    const canUndo = history === "local" && undoStackRef.current.length > 0;
-    const canRedo = history === "local" && redoStackRef.current.length > 0;
-    setProps?.({ canUndo, canRedo });
+    const next = {
+      canUndo: history === "local" && undoStackRef.current.length > 0,
+      canRedo: history === "local" && redoStackRef.current.length > 0,
+    };
+    const published = publishedHistoryStateRef.current;
+    if (
+      published.canUndo !== next.canUndo ||
+      published.canRedo !== next.canRedo
+    ) {
+      publishedHistoryStateRef.current = next;
+      setProps?.(next);
+    }
   }, [history, setProps]);
 
   const commitAnnotations = useCallback(
@@ -829,7 +854,14 @@ function AnnotationLayer({
       const point = event.target.getStage()?.getPointerPosition();
       if (point) {
         gesture.annotation = updateDraft(gesture, point.x, point.y);
-        setDraft(gesture.annotation);
+        if (draftFrameRef.current == null) {
+          draftFrameRef.current = window.requestAnimationFrame(() => {
+            draftFrameRef.current = null;
+            if (gestureRef.current?.pointerId === gesture.pointerId) {
+              setDraft(gestureRef.current.annotation);
+            }
+          });
+        }
       }
     },
     [],
@@ -844,6 +876,10 @@ function AnnotationLayer({
       const completed = point
         ? updateDraft(gesture, point.x, point.y)
         : gesture.annotation;
+      if (draftFrameRef.current != null) {
+        window.cancelAnimationFrame(draftFrameRef.current);
+        draftFrameRef.current = null;
+      }
       gestureRef.current = null;
       setDraft(null);
 
@@ -866,6 +902,10 @@ function AnnotationLayer({
     (event: Konva.KonvaEventObject<PointerEvent>) => {
       event.evt.stopPropagation();
       if (gestureRef.current?.pointerId !== event.evt.pointerId) return;
+      if (draftFrameRef.current != null) {
+        window.cancelAnimationFrame(draftFrameRef.current);
+        draftFrameRef.current = null;
+      }
       gestureRef.current = null;
       setDraft(null);
     },
@@ -1191,6 +1231,15 @@ function AnnotationLayer({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [changeSelection, commitAnnotations, mode, redo, undo]);
+
+  useEffect(
+    () => () => {
+      if (draftFrameRef.current != null) {
+        window.cancelAnimationFrame(draftFrameRef.current);
+      }
+    },
+    [],
+  );
 
   const visibleAnnotations = mode === "edit" && draft
     ? [...renderedAnnotations, draft]

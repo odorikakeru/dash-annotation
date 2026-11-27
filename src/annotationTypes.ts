@@ -2,6 +2,7 @@ import type React from "react";
 
 export type AnnotationMode = "edit" | "view" | "hidden";
 export type AnnotationHistoryMode = "local" | "external" | "disabled";
+export type AnnotationPersistenceType = "local" | "session" | "memory";
 
 export type AnnotationTool =
   | "select"
@@ -141,6 +142,9 @@ export interface AnnotationLayerProps {
   clearHistoryRequest?: number;
   canUndo?: boolean;
   canRedo?: boolean;
+  persistence?: boolean | string | number;
+  persisted_props?: string[];
+  persistence_type?: AnnotationPersistenceType;
   className?: string;
   style?: React.CSSProperties;
   setProps?: (props: Partial<AnnotationLayerProps>) => void;
